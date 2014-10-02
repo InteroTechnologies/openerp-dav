@@ -1,0 +1,7 @@
+.settings
+*.pyc
+.*project
+.directory
+*.mo
+tools*
+stats*
