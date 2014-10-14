@@ -1,2 +1,2 @@
-import calendar_event
 import icalendar_model
+import calendar_event
