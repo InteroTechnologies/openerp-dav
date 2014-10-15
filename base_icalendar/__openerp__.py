@@ -25,6 +25,9 @@
     "name": "iCalendar support for models",
     "version": "0.1",
     "depends": ["base", "base_calendar"],
+     'external_dependencies': {
+        'python': ['vobject'],
+     },
     'author': 'Intero Technologies GmbH',
     "category": "",
     "summary": "Basic iCalendar support (mapping for calendar.event)",
