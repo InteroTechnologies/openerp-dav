@@ -35,8 +35,30 @@
             <field name="name">c</field>
             <field eval="1" name="calendar_collection" />
         </record>
+        <record id="document_directory_crm_meeting" model="document.directory">
+            <field name="domain">[]</field>
+            <field eval="1" name="resource_find_all" />
+            <field name="user_id" eval="False" />
+            <field name="company_id" ref="base.main_company" />
+            <field model="document.directory" name="parent_id" ref="document_directory_calendar_collection" />
+            <field name="type">directory</field>
+            <field eval="[(6,0,[ref('base.group_document_user')])]" name="group_ids" />
+            <field name="name">m-crm.meeting</field>
+            <field eval="1" name="calendar_collection" />
+        </record>
+        <record id="document_directory_calendar_event" model="document.directory">
+            <field name="domain">[]</field>
+            <field eval="1" name="resource_find_all" />
+            <field name="user_id" eval="False" />
+            <field name="company_id" ref="base.main_company" />
+            <field model="document.directory" name="parent_id" ref="document_directory_calendar_collection" />
+            <field name="type">directory</field>
+            <field eval="[(6,0,[ref('base.group_document_user')])]" name="group_ids" />
+            <field name="name">m-calendar.event</field>
+            <field eval="1" name="calendar_collection" />
+        </record>
         <record id="document_webdav_dir_property_calendarhomeset" model="document.webdav.dir.property">
-            <field model="document.directory" name="dir_id" ref="document_directory_calendar" />
+            <field model="document.directory" name="dir_id" eval="False" />
             <field name="namespace">urn:ietf:params:xml:ns:caldav</field>
             <!-- no parent, it is a global property -->
             <field name="name">calendar-home-set</field>

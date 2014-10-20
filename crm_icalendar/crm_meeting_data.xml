@@ -1,6 +1,12 @@
-<?xml version='1.0' encoding='UTF-8' ?>
-<openerp>
-  <data noupdate="1">
-    <function model="crm.meeting" name="_migrate_icalendar_uid"/>
-  </data>
-</openerp>
+<?xml version="1.0" encoding="utf-8"?>
+<calendar-query xmlns="urn:ietf:params:xml:ns:caldav">
+	<prop xmlns="DAV:">
+		<getetag xmlns="DAV:" />
+		<resourcetype xmlns="DAV:" />
+	</prop>
+	<filter xmlns="urn:ietf:params:xml:ns:caldav">
+		<comp-filter xmlns="urn:ietf:params:xml:ns:caldav" name="VCALENDAR">
+			<comp-filter xmlns="urn:ietf:params:xml:ns:caldav" name="VTODO" />
+		</comp-filter>
+	</filter>
+</calendar-query>

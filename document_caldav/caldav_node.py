@@ -38,6 +38,13 @@ class node_model_calendar_collection(nodes.node_res_obj):
     """The children of this node are all models that
     implement icalendar.component.model"""
 
+    DAV_M_NS = {
+        "DAV:": '_get_dav',
+    }
+
+    def get_dav_resourcetype(self, cr):
+        return [('collection', 'DAV:')]
+
     def _get_default_node(self):
         """Returns the default Web-/CalDav node."""
         return node_calendar("default", self, self.context, 'calendar.event')
@@ -108,7 +115,8 @@ class node_filter(nodes.node_class):
         return 'calendar-%d-%s' % (self.context.uid, self.ir_model)
 
     def get_dav_resourcetype(self, cr):
-        return [('collection', 'DAV:')]
+        return [('collection', 'DAV:'),
+                ('calendar', _NS_CALDAV)]
 
     def children(self, cr, domain=None):
         return self._child_get(cr, domain=domain)
@@ -292,7 +300,7 @@ class res_node_calendar(nodes.node_class):
         return self.get_data(cr)
 
     def get_dav_resourcetype(self, cr):
-        return ''
+        return [('calendar', _NS_CALDAV)]
 
     def get_data_len(self, cr, fil_obj=None):
         data = self.get_data(cr, fil_obj)
