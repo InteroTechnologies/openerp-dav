@@ -28,6 +28,7 @@ from openerp.addons.document.document import nodefd_static
 from openerp.tools.safe_eval import safe_eval
 import logging
 _logger = logging.getLogger(__name__)
+from openerp.tools.translate import _
 
 
 _NS_CALDAV = "urn:ietf:params:xml:ns:caldav"
@@ -41,104 +42,89 @@ class node_model_calendar_collection(nodes.node_res_obj):
     DAV_M_NS = {
         "DAV:": '_get_dav',
     }
+    
+    http_options = {'DAV': ['calendar-access']}
 
     def get_dav_resourcetype(self, cr):
         return [('collection', 'DAV:')]
 
-    def _get_default_node(self):
-        """Returns the default Web-/CalDav node."""
-        return node_calendar("default", self, self.context, 'calendar.event')
+    def _child_get(self, cr, name=False, parent_id=False, domain=None):
+        if name:
+            elements = name.split("-")
+            model = elements[1]
+            filter_id = None
+            if len(elements) > 2: 
+                filter_id = elements[2]
+            return self._get_nodes_by_name(cr, model, filter_id)
+        else:
+            return self._get_all_nodes(cr)
+    
 
-    def _get_filter_nodes(self, cr):
+    def _get_nodes_by_name(self, cr, ir_model, ir_filter_id=None):
+        model_obj = self.context._dirobj.pool.get('ir.model')
+        model_ids = model_obj.search(cr, self.context.uid,
+                                     [('model', '=', ir_model)])
+        model_data = model_obj.read(cr, self.context.uid, model_ids,
+                                    ['model', 'name'])
+        nodes = []
+        for _model in model_data:
+            displayname = _model['name']
+            model = _model['model']
+            if ir_filter_id:
+                filters_obj = self.context._dirobj.pool.get('ir.filters')
+                filter = filters_obj.browse(cr, self.context.uid, ir_filter_id)
+                nodes.append(node_calendar("filtered-%s-%s" % (model, filter.id), 
+                                           self,
+                                           self.context,
+                                           model, 
+                                           filter.domain, 
+                                           filter.id,
+                                           displayname = _("%s (filtered by %s)") 
+                                           % (displayname, filter.name),))
+            else:
+                nodes.append(node_calendar("all-%s" % ir_model, 
+                                           self,
+                                           self.context, 
+                                           model,
+                                           displayname=displayname))
+        return nodes
+
+
+    def _get_all_nodes(self, cr):
         """find all models that implement icalendar.component.model"""
         fields_obj = self.context._dirobj.pool.get('ir.model.fields')
         fields_ids = fields_obj.search(cr, self.context.uid,
                                        [('name', '=', 'component_uid'),
                                         ('model_id.model', '!=', 'icalendar.component.model')])
         fields = fields_obj.browse(cr, self.context.uid, fields_ids)
-        return [node_filter("m-%s" % _field.model_id.model, self,
-                            self.context, _field.model_id.model,
-                            _field.model_id.name)
-                for _field in fields]
-
-    def _get_filter_nodes_by_name(self, cr, ir_model=None):
-        model_obj = self.context._dirobj.pool.get('ir.model')
-        model_ids = model_obj.search(cr, self.context.uid,
-                                     [('model', '=', ir_model)])
-        model_data = model_obj.read(cr, self.context.uid, model_ids,
-                                    ['model', 'name'])
-        return [node_filter("m-%s" % ir_model, self,
-                            self.context, str(ir_model),
-                            _model['name'])
-                for _model in model_data]
-
-    def _child_get(self, cr, name=False, parent_id=False, domain=None):
-        if name:
-            if name.startswith('m-'):
-                return self._get_filter_nodes_by_name(cr, name[2:])
-            return [self._get_default_node()]
-
-        return [self._get_default_node()] + \
-            self._get_filter_nodes(cr)
-
-
-class node_filter(nodes.node_class):
-
-    """The children of this node are all custom filters of
-    a given model."""
-    DAV_M_NS = {
-        "DAV:": '_get_dav',
-    }
-
-    def __init__(self, path, parent, context, ir_model='calendar.event',
-                 displayname=''):
-        super(node_filter, self).__init__(path, parent, context)
-        self.mimetype = 'application/x-directory'
-        self.create_date = parent.create_date
-        self.ir_model = ir_model
-        self.displayname = displayname
-
-    def _get_default_node(self):
-        return node_calendar("default", self, self.context, self.ir_model)
-
-    def _get_filter_nodes(self, cr, filter_ids):
-        filters_obj = self.context._dirobj.pool.get('ir.filters')
-        filter_data = filters_obj.read(cr, self.context.uid, filter_ids,
+        nodes = []
+        for _field in fields:
+            displayname = _field.model_id.name
+            model = _field.model_id.model
+            nodes.append(node_calendar("all-%s" % model,
+                                       self,
+                                       self.context,
+                                       model, 
+                                       displayname=displayname))
+            # add filtered nodes
+            filters_obj = self.context._dirobj.pool.get('ir.filters')
+            filter_ids = filters_obj.search(cr, self.context.uid,
+                                            [('model_id', '=', _field.model_id.id),
+                                             ('user_id', 'in', [self.context.uid, False])])
+            filters_obj = self.context._dirobj.pool.get('ir.filters')
+            filter_data = filters_obj.read(cr, self.context.uid, filter_ids,
                                        ['context', 'domain', 'name'])
-        return [node_calendar("filtered-%s" % _filter['id'], self,
-                              self.context,
-                              self.ir_model, _filter['name'],
-                              _filter['domain'], _filter['id'])
-                for _filter in filter_data]
-
-    def _get_ttag(self, cr):
-        return 'calendar-%d-%s' % (self.context.uid, self.ir_model)
-
-    def get_dav_resourcetype(self, cr):
-        return [('collection', 'DAV:'),
-                ('calendar', _NS_CALDAV)]
-
-    def children(self, cr, domain=None):
-        return self._child_get(cr, domain=domain)
-
-    def child(self, cr, name, domain=None):
-        res = self._child_get(cr, name, domain=domain)
-        if res:
-            return res[0]
-        return None
-
-    def _child_get(self, cr, name=False, parent_id=False, domain=None):
-        if name:
-            if name.startswith('filtered-'):
-                return self._get_filter_nodes(cr, [int(name[9:])])
-            return [self._get_default_node()]
-
-        filters_obj = self.context._dirobj.pool.get('ir.filters')
-        filter_ids = filters_obj.search(cr, self.context.uid,
-                                        [('model_id', '=', self.ir_model),
-                                         ('user_id', 'in', [self.context.uid, False])])
-        return [self._get_default_node()] + \
-            self._get_filter_nodes(cr, filter_ids)
+            for _filter in filter_data:
+                nodes.append(node_calendar("filtered-%s-%s" % (model, _filter['id']), 
+                                           self,
+                                           self.context,
+                                           model, 
+                                           _filter['domain'], 
+                                           _filter['id']),
+                                           displayname = _("%s (filtered by %s)") 
+                                           % (displayname, _filter['name']),
+                             )
+        return nodes
 
 
 class node_calendar(nodes.node_class):
@@ -160,7 +146,7 @@ class node_calendar(nodes.node_class):
 
     def __init__(self, path, parent, context,
                  ir_model='calendar.event', filter_name=None,
-                 filter_domain=None, filter_id=None):
+                 filter_domain=None, filter_id=None, displayname=None):
         super(node_calendar, self).__init__(path, parent, context)
         self.mimetype = 'application/x-directory'
         self.create_date = parent.create_date
@@ -172,10 +158,13 @@ class node_calendar(nodes.node_class):
                 safe_eval(filter_domain)
         else:
             self.filter_domain = []
-        if filter_name:
-            self.displayname = "%s filtered by %s" % (ir_model, filter_name)
+        if not displayname:
+            if filter_name:
+                self.displayname = "%s filtered by %s" % (ir_model, filter_name)
+            else:
+                self.displayname = "%s" % path
         else:
-            self.displayname = "%s" % path
+            self.displayname = displayname
 
     def children(self, cr, domain=None):
         if not domain:
@@ -224,8 +213,11 @@ class node_calendar(nodes.node_class):
         return self.displayname
 
     def _get_caldav_supported_calendar_data(self, cr):
-        return ('calendar-data', 'urn:ietf:params:xml:ns:caldav', None,
+        return ('calendar-data', _NS_CALDAV, None,
                 {'content-type': "text/calendar", 'version': "2.0"})
+        
+    def _get_caldav_supported_calendar_component_set(self, cr):
+        return ('comp', _NS_CALDAV, None, {'name': 'VEVENT'})
 
     def _get_caldav_max_resource_size(self, cr):
         return 65535
@@ -238,10 +230,12 @@ class node_calendar(nodes.node_class):
         :param filter_node: the DOM Element of filter
         :return: a list for domain
         """
-        if not filter_node:
-            return []
-        if filter_node.localName != 'calendar-query':
-            return []
+        # FIXME support for VEVENT only
+        return []
+#         if not filter_node:
+#             return []
+#         if filter_node.localName != 'calendar-query':
+#             return []
 
         raise ValueError("filtering is not implemented")
 
