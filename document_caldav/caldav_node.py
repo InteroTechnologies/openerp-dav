@@ -306,7 +306,7 @@ class res_node_calendar(nodes.node_class):
         self.res_obj.set_icalendar(data)
 
     def _get_ttag(self, cr):
-        return 'calendar-%s-%d' % (self.res_obj._name,
+        return 'calendar-%s-%s' % (self.res_obj._name,
                                    self.res_obj.id)
 
     def rm(self, cr):
